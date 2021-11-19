@@ -50,6 +50,31 @@ def draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors):
     return image
 
 
+def draw_object_paths(image, boxes, idxs, colors, paths):
+    # Iterate over each object
+    if len(idxs) > 0:
+        for i in idxs.flatten():
+            # extract current coordinates
+            x, y = boxes[i][0], boxes[i][1]
+            w, h = boxes[i][2], boxes[i][3]
+            center_x = x + w / 2
+            center_y = y + h / 2
+
+            # append the object's current coordinates to the end of the path
+            if i not in paths:
+                paths[i] = []
+            paths[i].append((center_x, center_y))
+
+            # draw lines between each point on the bath
+            color = [int(c) for c in colors[classIDs[i]]]
+            prev_point = paths[i][0]
+            for point in paths[i]:
+                cv2.line(image, prev_point, point, color, 2)
+                prev_point = point
+
+    return image
+
+
 def make_prediction(net, layer_names, labels, image, confidence, threshold):
     height, width = image.shape[:2]
 
@@ -107,9 +132,7 @@ if __name__ == '__main__':
 
     # Get the ouput layer names
     layer_names = net.getLayerNames()
-    layer_names = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
-
-    cv2.namedWindow('YOLO Object Detection', cv2.WINDOW_NORMAL)
+    layer_names = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
     if args.image_path != '':
         image = cv2.imread(args.image_path)
@@ -139,6 +162,10 @@ if __name__ == '__main__':
             name = args.video_path.split("/")[-1] if args.video_path else 'camera.avi'
             out = cv2.VideoWriter(f'output/{name}', cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), fps, (width, height))
 
+        # Dict that maps an object's index to a list of points that comprise that object's path
+        # Each point is at the center of the object's bounding box
+        paths = {}
+
         while cap.isOpened():
             ret, image = cap.read()
 
@@ -150,7 +177,8 @@ if __name__ == '__main__':
                                                                  args.threshold)
 
             image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
-            image = cv2.resize(image, (960, 540))
+
+            image = draw_object_paths(image, boxes, idxs, colors, paths)
 
             if args.show:
                 cv2.imshow('YOLO Object Detection', image)
