@@ -9,6 +9,7 @@ def extract_boxes_confidences_classids(outputs, confidence, width, height):
     boxes = []
     confidences = []
     classIDs = []
+    objIDs = []
 
     for output in outputs:
         for detection in output:
@@ -30,8 +31,9 @@ def extract_boxes_confidences_classids(outputs, confidence, width, height):
                 boxes.append([x, y, int(w), int(h)])
                 confidences.append(float(conf))
                 classIDs.append(classID)
+                objIDs.append(int(detection[4]))
 
-    return boxes, confidences, classIDs
+    return boxes, confidences, classIDs, objIDs
 
 
 def draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors):
@@ -50,7 +52,7 @@ def draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors):
     return image
 
 
-def draw_object_paths(image, boxes, idxs, colors, paths):
+def draw_object_paths(image, boxes, idxs, colors, paths, objIDs):
     # Iterate over each object
     if len(idxs) > 0:
         for i in idxs.flatten():
@@ -59,16 +61,17 @@ def draw_object_paths(image, boxes, idxs, colors, paths):
             w, h = boxes[i][2], boxes[i][3]
             center_x = int(x + w / 2)
             center_y = int(y + h / 2)
+            objID = objIDs[i]
 
             # append the object's current coordinates to the end of the path
             if i not in paths:
-                paths[i] = []
-            paths[i].append((center_x, center_y))
+                paths[objID] = []
+            paths[objID].append((center_x, center_y))
 
             # draw lines between each point on the bath
             color = [int(c) for c in colors[classIDs[i]]]
-            prev_point = paths[i][0]
-            for point in paths[i]:
+            prev_point = paths[objID][0]
+            for point in paths[objID]:
                 cv2.line(image, prev_point, point, color, 2)
                 prev_point = point
 
@@ -84,12 +87,12 @@ def make_prediction(net, layer_names, labels, image, confidence, threshold):
     outputs = net.forward(layer_names)
 
     # Extract bounding boxes, confidences and classIDs
-    boxes, confidences, classIDs = extract_boxes_confidences_classids(outputs, confidence, width, height)
+    boxes, confidences, classIDs, objIDs = extract_boxes_confidences_classids(outputs, confidence, width, height)
 
     # Apply Non-Max Suppression
     idxs = cv2.dnn.NMSBoxes(boxes, confidences, confidence, threshold)
 
-    return boxes, confidences, classIDs, idxs
+    return boxes, confidences, classIDs, idxs, objIDs
 
 
 if __name__ == '__main__':
@@ -132,14 +135,14 @@ if __name__ == '__main__':
 
     # Get the ouput layer names
     layer_names = net.getLayerNames()
-    layer_names = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+    layer_names = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
 
     cv2.namedWindow('YOLO Object Detection', cv2.WINDOW_NORMAL)
 
     if args.image_path != '':
         image = cv2.imread(args.image_path)
 
-        boxes, confidences, classIDs, idxs = make_prediction(net, layer_names, labels, image, args.confidence,
+        boxes, confidences, classIDs, idxs, objIDs = make_prediction(net, layer_names, labels, image, args.confidence,
                                                              args.threshold)
 
         image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
@@ -176,12 +179,12 @@ if __name__ == '__main__':
                 print('Video file finished.')
                 break
 
-            boxes, confidences, classIDs, idxs = make_prediction(net, layer_names, labels, image, args.confidence,
+            boxes, confidences, classIDs, idxs, objIDs = make_prediction(net, layer_names, labels, image, args.confidence,
                                                                  args.threshold)
 
             image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
 
-            image = draw_object_paths(image, boxes, idxs, colors, paths)
+            image = draw_object_paths(image, boxes, idxs, colors, paths, objIDs)
 
             cv2.resize(image, (960, 540))
 
