@@ -57,8 +57,8 @@ def draw_object_paths(image, boxes, idxs, colors, paths):
             # extract current coordinates
             x, y = boxes[i][0], boxes[i][1]
             w, h = boxes[i][2], boxes[i][3]
-            center_x = x + w / 2
-            center_y = y + h / 2
+            center_x = int(x + w / 2)
+            center_y = int(y + h / 2)
 
             # append the object's current coordinates to the end of the path
             if i not in paths:
@@ -132,7 +132,9 @@ if __name__ == '__main__':
 
     # Get the ouput layer names
     layer_names = net.getLayerNames()
-    layer_names = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+    layer_names = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+
+    cv2.namedWindow('YOLO Object Detection', cv2.WINDOW_NORMAL)
 
     if args.image_path != '':
         image = cv2.imread(args.image_path)
@@ -144,6 +146,7 @@ if __name__ == '__main__':
 
         # show the output image
         if args.show:
+            cv2.resize(image, (960, 540))
             cv2.imshow('YOLO Object Detection', image)
             cv2.waitKey(0)
 
@@ -179,6 +182,8 @@ if __name__ == '__main__':
             image = draw_bounding_boxes(image, boxes, confidences, classIDs, idxs, colors)
 
             image = draw_object_paths(image, boxes, idxs, colors, paths)
+
+            cv2.resize(image, (960, 540))
 
             if args.show:
                 cv2.imshow('YOLO Object Detection', image)
